@@ -581,50 +581,32 @@ body {
     <div class="screen" id="screen-history">
 
       <div class="screen-header">
-        <div class="screen-eyebrow">Goal A ｜ 2025年</div>
+        <div class="screen-eyebrow">Goal A ｜ 2025〜2026</div>
         <div class="screen-title">月次履歴</div>
-        <div class="screen-desc">各月をタップして「なぜ多かったか」の内訳を確認する</div>
+        <div class="screen-desc">各月をタップして固定費・変動費・特別費の内訳を確認</div>
       </div>
 
-      <!-- Inner tabs -->
-      <div class="inner-tabs">
-        <div class="inner-tab active" onclick="switchInner(this,'history-grid')">🗓 月次グリッド</div>
-        <div class="inner-tab" onclick="switchInner(this,'history-stack')">📊 3分類</div>
-      </div>
-
-      <!-- Grid panel -->
-      <div id="history-grid">
-        <div class="card" style="margin-bottom:10px;">
-          <div class="mgrid" id="mgrid"></div>
-          <div class="drill" id="drill">
-            <div class="drill-title" id="drillTitle"></div>
-            <div id="drillBars"></div>
-          </div>
-        </div>
-        <div class="note">
-          <strong>🚨 赤:</strong> 3月・6月（美容¥76万・¥50万）σ除外 ｜
-          <strong>⚠️ 黄:</strong> 5月・7月（税金含む）
-        </div>
-      </div>
-
-      <!-- Stack panel -->
-      <div id="history-stack" style="display:none;">
-        <div class="card">
-          <div class="card-title">📊 固定費・変動費・特別費 推移</div>
-          <div style="position:relative;height:240px;width:100%;">
+      <div class="card">
+        <div class="card-title">📊 固定費・変動費・特別費 推移</div>
+        <div style="position:relative;height:240px;width:100%;">
           <canvas id="chartStack"></canvas>
         </div>
-          <div class="legend" style="margin-top:12px;">
-            <div class="legend-item"><div class="legend-dot" style="background:#3b82f6aa;"></div>固定費</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#34d399aa;"></div>変動費</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#f59e0baa;"></div>特別費</div>
-          </div>
+        <div class="legend" style="margin-top:12px;">
+          <div class="legend-item"><div class="legend-dot" style="background:#3b82f6aa;"></div>固定費</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34d399aa;"></div>変動費</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0baa;"></div>特別費</div>
         </div>
-        <div class="note">
-          <strong>固定費:</strong> 実家送金・docomo・サブスク（Netflix/FOD/Amazon/Claude等）｜
-          <strong>特別費:</strong> 税金・美容整形・家電・旅行・臨時 ｜
-          <strong>変動費:</strong> 交際費（PayPay含む）・交通・食費・日用品
-        </div>
+      </div>
+
+      <div class="drill" id="stackDrill">
+        <div class="drill-title" id="stackDrillTitle"></div>
+        <div id="stackDrillContent"></div>
+      </div>
+
+      <div class="note">
+        <strong>固定費:</strong> 実家送金・docomo・サブスク ｜
+        <strong>変動費:</strong> 交際費・交通・食費・日用品 ｜
+        <strong>特別費:</strong> 美容整形・家電・税金・旅行
       </div>
 
     </div><!-- /screen-history -->
@@ -725,16 +707,11 @@ function goScreen(id, btn) {
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   currentScreen = id;
+  if(id === 'history') maybeInitStack();
 }
 
-function switchInner(el, panelId) {
-  document.querySelectorAll('.inner-tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  document.querySelectorAll('#history-grid,#history-stack').forEach(p=>p.style.display='none');
-  document.getElementById(panelId).style.display = 'block';
-  // lazy-init stack chart
-  if(panelId === 'history-stack' && !stackInited) initStackChart();
-}
+// init stack chart when history screen is first opened
+function maybeInitStack() { if(!stackInited) initStackChart(); }
 
 // ━━━━━━━━ KPI CARDS ━━━━━━━━
 (function(){
@@ -842,112 +819,131 @@ function switchInner(el, panelId) {
   });
 })();
 
-// ━━━━━━━━ MONTHLY GRID + DRILL ━━━━━━━━
-(function(){
-  const cats={
-    'PayPay実支出':[41938,69030,20364,7210,65279,50257,46819,31903,20033,2158,51342,37879],
-    '電車・交通':  [40000,40000,63014,38601,41597,77364,84221,46655,64165,84607,57298,40000],
-    '美容':        [0,100000,762215,11100,0,501660,0,0,0,0,0,35124],
-    '電化製品':    [79140,92948,14334,42860,12323,2080,31372,23774,6643,0,0,0],
-    '食費':        [0,5446,46680,17404,11521,77340,63342,34959,37953,21858,11745,0],
-    '税金':        [0,0,0,0,67562,0,150640,0,0,0,133329,0],
-    '未定':        [16390,58385,16390,16390,57390,16390,19690,16390,16390,16390,2130,57547],
-    'WEBサービス': [13878,15098,13228,19220,10158,4498,20398,4498,19754,19075,12476,10457],
-    'ホテル・旅行':[0,0,0,0,0,0,14320,10600,0,40435,0,28550],
-    '携帯電話':    [15664,5657,4351,2914,3573,3683,3435,1426,2526,2526,2526,3096],
-  };
-  const pal=['#ef4444','#60a5fa','#f87171','#a78bfa','#34d399','#fbbf24','#6b7280','#06b6d4','#f97316','#8b5cf6'];
-  const grid=document.getElementById('mgrid');
-  let openIdx=-1;
+// ━━━━━━━━ STACK CHART + DRILL ━━━━━━━━
+const cats={
+  'PayPay実支出':[41938,69030,20364,7210,65279,50257,46819,31903,20033,2158,51342,37879],
+  '電車・交通':  [40000,40000,63014,38601,41597,77364,84221,46655,64165,84607,57298,40000],
+  '美容':        [0,100000,762215,11100,0,501660,0,0,0,0,0,35124],
+  '電化製品':    [79140,92948,14334,42860,12323,2080,31372,23774,6643,0,0,0],
+  '食費':        [0,5446,46680,17404,11521,77340,63342,34959,37953,21858,11745,0],
+  '税金':        [0,0,0,0,67562,0,150640,0,0,0,133329,0],
+  '未定':        [16390,58385,16390,16390,57390,16390,19690,16390,16390,16390,2130,57547],
+  'WEBサービス': [13878,15098,13228,19220,10158,4498,20398,4498,19754,19075,12476,10457],
+  'ホテル・旅行':[0,0,0,0,0,0,14320,10600,0,40435,0,28550],
+  '携帯電話':    [15664,5657,4351,2914,3573,3683,3435,1426,2526,2526,2526,3096],
+};
 
-  // 2025年セクションヘッダー
-  const hdr25=document.createElement('div');
-  hdr25.style.cssText='grid-column:1/-1;font-size:10px;font-weight:700;color:#2a3458;letter-spacing:1.5px;padding:4px 0 2px;';
-  hdr25.textContent='─ 2025 ─';
-  grid.appendChild(hdr25);
+let stackInited=false, stackOpenIdx=-1;
 
-  M25.forEach((m,i)=>{
-    const v=T25[i], z=(v-μ)/σ;
-    const ia=ANOMALY.includes(i);
-    const cls=ia?'c-anomaly':z>1?'c-high':z<-0.7?'c-low':'c-normal';
-    const col=ia?'#f87171':z>1?'#fbbf24':z<-0.7?'#34d399':'#60a5fa';
-    const cell=document.createElement('div');
-    cell.className=`mcell ${cls}`;
-    cell.innerHTML=`<div class="mcell-lbl">${m}</div><div class="mcell-val" style="color:${col};">¥${(v/10000).toFixed(1)}<span style="font-size:8px;">万</span></div><div class="mcell-z">z ${z>=0?'+':''}${z.toFixed(1)}</div>`;
-    cell.addEventListener('click',()=>{
-      const dr=document.getElementById('drill');
-      if(openIdx===i){dr.classList.remove('open');openIdx=-1;return;}
-      openIdx=i;
-      const entries=Object.entries(cats).map(([k,a])=>[k,a[i]]).filter(([,a])=>a>0).sort((a,b)=>b[1]-a[1]);
-      const mx=entries[0]?.[1]||1;
-      document.getElementById('drillTitle').textContent=`${m}（¥${v.toLocaleString()}）の内訳`;
-      document.getElementById('drillBars').innerHTML=entries.map(([k,a],ci)=>
-        `<div class="drill-row">
-          <div class="drill-cat">${k}</div>
-          <div class="drill-track"><div class="drill-fill" style="width:${Math.round(a/mx*100)}%;background:${pal[ci%pal.length]}88;"></div></div>
-          <div class="drill-val" style="color:${pal[ci%pal.length]};">¥${Math.round(a/1000)}K</div>
-        </div>`).join('');
-      dr.classList.add('open');
-      setTimeout(()=>dr.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
-    });
-    grid.appendChild(cell);
-  });
-
-  // 2026年セクションヘッダー
-  const hdr26=document.createElement('div');
-  hdr26.style.cssText='grid-column:1/-1;font-size:10px;font-weight:700;color:#243060;letter-spacing:1.5px;padding:8px 0 2px;';
-  hdr26.textContent='─ 2026 ─';
-  grid.appendChild(hdr26);
-
-  const M26=['1月','2月','3月'];
-  M26.forEach((m,i)=>{
-    const v=T26[i], z=(v-μ)/σ;
-    const cls=z>1?'c-high':z<-0.7?'c-low':'c-normal';
-    const col=z>1?'#fbbf24':z<-0.7?'#34d399':'#60a5fa';
-    const cell=document.createElement('div');
-    cell.className=`mcell ${cls}`;
-    cell.style.borderColor='#fbbf2440';
-    cell.innerHTML=`<div class="mcell-lbl" style="color:#fbbf2488;">26/${m}</div><div class="mcell-val" style="color:${col};">¥${(v/10000).toFixed(1)}<span style="font-size:8px;">万</span></div><div class="mcell-z">z ${z>=0?'+':''}${z.toFixed(1)}</div>`;
-    cell.addEventListener('click',()=>{
-      const dr=document.getElementById('drill');
-      if(openIdx===100+i){dr.classList.remove('open');openIdx=-1;return;}
-      openIdx=100+i;
-      const f=F26[i], s=S26[i], vv=V26[i];
-      document.getElementById('drillTitle').textContent=`2026年${m}（¥${v.toLocaleString()}）の内訳`;
-      document.getElementById('drillBars').innerHTML=[
-        ['変動費',vv,'#34d399'],['固定費',f,'#3b82f6'],['特別費',s,'#f59e0b']
-      ].filter(([,a])=>a>0).map(([k,a,c])=>{
-        const mx=Math.max(vv,f,s)||1;
-        return `<div class="drill-row"><div class="drill-cat">${k}</div><div class="drill-track"><div class="drill-fill" style="width:${Math.round(a/mx*100)}%;background:${c}88;"></div></div><div class="drill-val" style="color:${c};">¥${Math.round(a/1000)}K</div></div>`;
-      }).join('');
-      dr.classList.add('open');
-      setTimeout(()=>dr.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
-    });
-    grid.appendChild(cell);
-  });
-})();
-
-// ━━━━━━━━ STACK CHART (lazy) ━━━━━━━━
-let stackInited=false;
 function initStackChart(){
   if(stackInited)return;
   stackInited=true;
   const short=M25.map(m=>'25/'+m.replace('月',''));
   const labels=[...short,'26/1','26/2','26/3'];
+  const allF=[...F25,...F26], allV=[...V25,...V26], allS=[...S25,...S26];
+
+  const totalLabelPlugin={
+    id:'totalLabels',
+    afterDatasetsDraw(chart){
+      const {ctx}=chart;
+      const meta=chart.getDatasetMeta(2);
+      labels.forEach((_,i)=>{
+        const bar=meta.data[i];
+        if(!bar)return;
+        const tot=(allF[i]||0)+(allV[i]||0)+(allS[i]||0);
+        ctx.save();
+        ctx.fillStyle='#c8d0e088';
+        ctx.font='bold 8px -apple-system,sans-serif';
+        ctx.textAlign='center';
+        ctx.textBaseline='bottom';
+        ctx.fillText('¥'+(tot/10000).toFixed(1)+'万', bar.x, bar.y-2);
+        ctx.restore();
+      });
+    }
+  };
+
   new Chart(document.getElementById('chartStack'),{
     type:'bar',
     data:{labels,datasets:[
-      {label:'固定費',data:[...F25,...F26],backgroundColor:'#3b82f6aa',borderRadius:2},
-      {label:'変動費',data:[...V25,...V26],backgroundColor:'#34d399aa'},
-      {label:'特別費',data:[...S25,...S26],backgroundColor:'#f59e0baa'},
+      {label:'固定費',data:allF,backgroundColor:'#3b82f6aa',borderRadius:2},
+      {label:'変動費',data:allV,backgroundColor:'#34d399aa'},
+      {label:'特別費',data:allS,backgroundColor:'#f59e0baa'},
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{
-      afterBody:items=>[`合計: ¥${items.reduce((s,i)=>s+i.parsed.y,0).toLocaleString()}`]
-    }}},scales:{
-      x:{stacked:true,grid:{color:'#0e1220'},ticks:{color:'#1e2840',font:{size:9},maxRotation:45}},
-      y:{stacked:true,grid:{color:'#0e1220'},ticks:{color:'#2a3458',font:{size:9},callback:v=>`¥${(v/10000).toFixed(0)}万`}}
-    }}
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      onClick(_,els){if(els.length)showStackDrill(els[0].index);},
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{
+        x:{stacked:true,grid:{color:'#0e1220'},ticks:{color:'#1e2840',font:{size:9},maxRotation:45}},
+        y:{stacked:true,grid:{color:'#0e1220'},ticks:{color:'#2a3458',font:{size:9},callback:v=>`¥${(v/10000).toFixed(0)}万`}}
+      }
+    },
+    plugins:[totalLabelPlugin]
   });
+}
+
+function showStackDrill(idx){
+  const allLabels=[...M25.map((m,i)=>({lbl:'2025年'+m,yr:2025,mi:i})),
+                   ...['1月','2月','3月'].map((m,i)=>({lbl:'2026年'+m,yr:2026,mi:i}))];
+  const {lbl,yr,mi}=allLabels[idx];
+  const drill=document.getElementById('stackDrill');
+  if(stackOpenIdx===idx){drill.classList.remove('open');stackOpenIdx=-1;return;}
+  stackOpenIdx=idx;
+
+  const F=yr===2025?F25[mi]:F26[mi];
+  const V=yr===2025?V25[mi]:V26[mi];
+  const S=yr===2025?S25[mi]:S26[mi];
+  const total=F+V+S;
+
+  const pal=['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#06b6d4','#f97316','#8b5cf6','#ef4444','#6b7280'];
+
+  function buildRows(items){
+    const mx=Math.max(...items.map(([,v])=>Math.abs(v)),1);
+    return items.map(([k,v],ci)=>`
+      <div class="drill-row">
+        <div class="drill-cat">${k}</div>
+        <div class="drill-track"><div class="drill-fill" style="width:${Math.round(Math.abs(v)/mx*100)}%;background:${pal[ci%pal.length]}88;"></div></div>
+        <div class="drill-val" style="color:${pal[ci%pal.length]};">${v>=0?'¥'+Math.round(v/1000)+'K':'−¥'+Math.round(-v/1000)+'K'}</div>
+      </div>`).join('');
+  }
+
+  function section(name,amount,color,items){
+    const rows=items
+      ? buildRows(items)
+      : `<div style="color:#2a3458;font-size:11px;padding:2px 0 6px;">実家送金・docomo・サブスク等</div>`;
+    return `<div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;border-bottom:1px solid ${color}22;padding-bottom:4px;">${name}　¥${amount.toLocaleString()}</div>
+      ${rows}
+    </div>`;
+  }
+
+  let fItems=null, vItems=null, sItems=null;
+  if(yr===2025){
+    const fCats=['WEBサービス','携帯電話'];
+    const vCats=['PayPay実支出','電車・交通','食費'];
+    const sCats=['美容','電化製品','税金','ホテル・旅行','未定'];
+
+    fItems=fCats.map(k=>[k,cats[k]?.[mi]||0]).filter(([,v])=>v>0);
+    const fRest=F-fItems.reduce((s,[,v])=>s+v,0);
+    if(fRest>500)fItems.push(['実家送金・その他',fRest]);
+
+    vItems=vCats.map(k=>[k,cats[k]?.[mi]||0]).filter(([,v])=>v>0);
+    const vRest=V-vItems.reduce((s,[,v])=>s+v,0);
+    if(Math.abs(vRest)>500)vItems.push(['その他',vRest]);
+
+    sItems=sCats.map(k=>[k,cats[k]?.[mi]||0]).filter(([,v])=>v>0);
+    const sRest=S-sItems.reduce((s,[,v])=>s+v,0);
+    if(Math.abs(sRest)>500)sItems.push(['その他',sRest]);
+  }
+
+  document.getElementById('stackDrillTitle').textContent=`${lbl}　合計 ¥${total.toLocaleString()}`;
+  document.getElementById('stackDrillContent').innerHTML=
+    section('固定費',F,'#3b82f6',fItems)+
+    section('変動費',V,'#34d399',vItems)+
+    section('特別費',S,'#f59e0b',sItems);
+
+  drill.classList.add('open');
+  setTimeout(()=>drill.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
 </script>
 </body>
