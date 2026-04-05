@@ -833,6 +833,18 @@ const cats={
   '携帯電話':    [15664,5657,4351,2914,3573,3683,3435,1426,2526,2526,2526,3096],
 };
 
+// 2026年カテゴリ内訳（判明分のみ）
+const cats26={
+  '税金':[0,0,149540],
+};
+// ノーカウント候補カテゴリ（予算外として除外できる項目）
+const NC_CATS=['税金'];
+const noCountKeys=new Set();
+function toggleNC(k){
+  if(noCountKeys.has(k))noCountKeys.delete(k);else noCountKeys.add(k);
+  showStackDrill(stackOpenIdx);
+}
+
 let stackInited=false, stackOpenIdx=-1;
 
 function initStackChart(){
@@ -893,26 +905,40 @@ function showStackDrill(idx){
   const F=yr===2025?F25[mi]:F26[mi];
   const V=yr===2025?V25[mi]:V26[mi];
   const S=yr===2025?S25[mi]:S26[mi];
-  const total=F+V+S;
 
   const pal=['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#06b6d4','#f97316','#8b5cf6','#ef4444','#6b7280'];
 
+  function ncAmt(items){
+    if(!items)return 0;
+    return items.filter(([k])=>noCountKeys.has(`${yr}_${mi}_${k}`)).reduce((s,[,v])=>s+v,0);
+  }
+
   function buildRows(items){
     const mx=Math.max(...items.map(([,v])=>Math.abs(v)),1);
-    return items.map(([k,v],ci)=>`
-      <div class="drill-row">
-        <div class="drill-cat">${k}</div>
+    return items.map(([k,v],ci)=>{
+      const ncKey=`${yr}_${mi}_${k}`;
+      const isNC=NC_CATS.includes(k);
+      const isExc=noCountKeys.has(ncKey);
+      const dimStyle=isExc?'opacity:0.38;':'';
+      const ncBtn=isNC
+        ?`<button onclick="toggleNC('${ncKey}')" style="margin-left:6px;font-size:9px;padding:1px 7px;border-radius:8px;border:1px solid ${isExc?'#34d39966':'#f87171aa'};background:${isExc?'#34d39914':'#f8717114'};color:${isExc?'#34d399':'#f87171'};cursor:pointer;">${isExc?'✓除外中':'除外'}</button>`
+        :'';
+      return `<div class="drill-row" style="${dimStyle}">
+        <div class="drill-cat" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;">${k}${ncBtn}</div>
         <div class="drill-track"><div class="drill-fill" style="width:${Math.round(Math.abs(v)/mx*100)}%;background:${pal[ci%pal.length]}88;"></div></div>
         <div class="drill-val" style="color:${pal[ci%pal.length]};">${v>=0?'¥'+Math.round(v/1000)+'K':'−¥'+Math.round(-v/1000)+'K'}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function section(name,amount,color,items){
     const rows=items
       ? buildRows(items)
       : `<div style="color:#2a3458;font-size:11px;padding:2px 0 6px;">実家送金・docomo・サブスク等</div>`;
+    const nc=ncAmt(items);
+    const adjNote=nc>0?`　<span style="color:#34d399;font-size:10px;font-weight:500;">→ 除外後 ¥${(amount-nc).toLocaleString()}</span>`:'';
     return `<div style="margin-bottom:16px;">
-      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;border-bottom:1px solid ${color}22;padding-bottom:4px;">${name}　¥${amount.toLocaleString()}</div>
+      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;border-bottom:1px solid ${color}22;padding-bottom:4px;">${name}　¥${amount.toLocaleString()}${adjNote}</div>
       ${rows}
     </div>`;
   }
@@ -934,9 +960,20 @@ function showStackDrill(idx){
     sItems=sCats.map(k=>[k,cats[k]?.[mi]||0]).filter(([,v])=>v>0);
     const sRest=S-sItems.reduce((s,[,v])=>s+v,0);
     if(Math.abs(sRest)>500)sItems.push(['その他',sRest]);
+  } else {
+    // 2026: 税金のみ判明
+    sItems=[];
+    const taxVal=cats26['税金']?.[mi]||0;
+    if(taxVal>0)sItems.push(['税金',taxVal]);
+    const sRest=S-sItems.reduce((s,[,v])=>s+v,0);
+    if(Math.abs(sRest)>500)sItems.push(['その他',sRest]);
+    if(sItems.length===0)sItems=null;
   }
 
-  document.getElementById('stackDrillTitle').textContent=`${lbl}　合計 ¥${total.toLocaleString()}`;
+  const totalNC=ncAmt(sItems);
+  const total=F+V+S;
+  const totalNote=totalNC>0?`　<span style="font-size:12px;color:#34d399;">→ 除外後 ¥${(total-totalNC).toLocaleString()}</span>`:'';
+  document.getElementById('stackDrillTitle').innerHTML=`${lbl}　合計 ¥${total.toLocaleString()}${totalNote}`;
   document.getElementById('stackDrillContent').innerHTML=
     section('固定費',F,'#3b82f6',fItems)+
     section('変動費',V,'#34d399',vItems)+
