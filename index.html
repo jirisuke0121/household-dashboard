@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="家計">
+<meta name="theme-color" content="#07090f">
+<title>家計ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   BASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+  background: #07090f;
+  overflow: hidden;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+  background: #07090f;
+  color: #c8d0e0;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  height: 100%;
+  height: -webkit-fill-available;
+  overflow: hidden;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   APP SHELL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.app {
+  display: flex; flex-direction: column;
+  height: 100%;
+  height: -webkit-fill-available;
+  max-width: 600px;
+  margin: 0 auto; position: relative;
+  background: #07090f;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  flex-shrink: 0;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid #0e1220;
+  display: flex; align-items: flex-end; justify-content: space-between;
+}
+.topbar-title { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+.topbar-sub { font-size: 10px; color: #1e2840; }
+.topbar-badge {
+  background: #1a0707; border: 1px solid #5a1010;
+  border-radius: 20px; padding: 3px 10px;
+  font-size: 11px; font-weight: 700; color: #f87171;
+  flex-shrink: 0;
+}
+
+/* ── SCREEN CONTAINER ── */
+.screens {
+  flex: 1; overflow: hidden; position: relative;
+}
+.screen {
+  position: absolute; inset: 0;
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 20px 100px;
+  opacity: 0; pointer-events: none;
+  transform: translateX(40px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  will-change: transform, opacity;
+}
+.screen.active {
+  opacity: 1; pointer-events: auto;
+  transform: translateX(0);
+}
+.screen.slide-left {
+  transform: translateX(-40px);
+}
+
+/* ── BOTTOM NAV ── */
+.nav {
+  flex-shrink: 0;
+  display: flex;
+  border-top: 1px solid #0e1220;
+  background: #07090f;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 10px 8px 6px;
+  cursor: pointer; border: none; background: none;
+  transition: opacity 0.15s;
+  min-height: 56px;
+}
+.nav-item:active { opacity: 0.6; }
+.nav-icon { font-size: 22px; line-height: 1; margin-bottom: 3px; }
+.nav-label { font-size: 10px; font-weight: 600; color: #2a3458; transition: color 0.15s; }
+.nav-item.active .nav-label { color: #60a5fa; }
+.nav-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: transparent; margin-top: 3px;
+  transition: background 0.15s;
+}
+.nav-item.active .nav-dot { background: #60a5fa; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   COMPONENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Screen title */
+.screen-header { margin-bottom: 20px; }
+.screen-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #1e2840; margin-bottom: 4px; }
+.screen-title { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+.screen-desc { font-size: 12px; color: #2a3458; margin-top: 4px; line-height: 1.5; }
+
+/* Card */
+.card {
+  background: #0c0f1e; border: 1px solid #141a2e;
+  border-radius: 18px; padding: 18px 18px;
+  margin-bottom: 14px;
+}
+.card-title { font-size: 11px; font-weight: 700; color: #3a4d70; margin-bottom: 4px; }
+.card-sub { font-size: 11px; color: #1e2840; margin-bottom: 14px; line-height: 1.4; }
+
+/* Alert */
+.alert {
+  background: #130606; border: 1.5px solid #5a1010;
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 14px;
+}
+.alert-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.alert-icon { font-size: 20px; }
+.alert-title { font-size: 14px; font-weight: 800; color: #f87171; }
+.alert-sub { font-size: 11px; color: #5a3030; }
+.alert-services { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.alert-svc {
+  background: #1e0808; border: 1px solid #3a1010;
+  border-radius: 10px; padding: 8px 14px; flex: 1; min-width: 100px;
+}
+.alert-svc-name { font-size: 13px; font-weight: 800; color: #f87171; }
+.alert-svc-detail { font-size: 10px; color: #5a3030; margin-top: 2px; }
+.alert-action {
+  background: #1a0808; border-radius: 10px; padding: 10px 14px;
+  font-size: 12px; color: #7b3030; text-align: center;
+}
+.alert-action strong { color: #f87171; }
+
+/* KPI */
+.kpi-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 0 20px 8px; }
+.kpi-scroll::-webkit-scrollbar { display: none; }
+.kpi {
+  background: #0c0f1e; border: 1px solid #141a2e;
+  border-radius: 18px; padding: 18px 18px 16px;
+  flex-shrink: 0; width: 200px;
+}
+.kpi-month { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; color: #2a3458; margin-bottom: 10px; text-transform: uppercase; }
+.kpi-amount { font-size: 30px; font-weight: 900; letter-spacing: -1.5px; line-height: 1; }
+.kpi-amount span { font-size: 14px; font-weight: 500; }
+.kpi-z {
+  font-size: 11px; margin-top: 8px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.zbadge { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+.zbadge-ok    { background: #071a0e; color: #34d399; }
+.zbadge-warn  { background: #1a1000; color: #fbbf24; }
+.zbadge-alert { background: #1a0707; color: #f87171; }
+.zbadge-blue  { background: #071228; color: #60a5fa; }
+.kpi-bars { margin-top: 14px; display: flex; flex-direction: column; gap: 5px; }
+.kpi-bar-row { display: flex; align-items: center; gap: 8px; }
+.kpi-bar-lbl { font-size: 9px; color: #1e2840; width: 34px; text-align: right; flex-shrink: 0; }
+.kpi-bar-track { flex: 1; height: 4px; background: #0a0d18; border-radius: 2px; overflow: hidden; }
+.kpi-bar-fill { height: 100%; border-radius: 2px; }
+.kpi-bar-val { font-size: 9px; font-weight: 700; width: 32px; text-align: right; flex-shrink: 0; }
+
+/* Chart */
+.chart-wrap { position: relative; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #2a3458; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* Note */
+.note {
+  background: #090c18; border: 1px solid #101828;
+  border-radius: 10px; padding: 10px 13px;
+  font-size: 11px; color: #2a3458; line-height: 1.7;
+  margin-top: 12px;
+}
+.note strong { color: #3a4d70; }
+
+/* Subscription table */
+.sub-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+.sub-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 440px; }
+.sub-table th {
+  font-size: 9px; font-weight: 700; color: #1a2440;
+  padding: 5px 7px; border-bottom: 1px solid #0e1220;
+  text-align: center; letter-spacing: 0.5px; white-space: nowrap;
+}
+.sub-table th.th-l { text-align: left; }
+.sub-table td { padding: 7px 7px; border-bottom: 1px solid #090c18; vertical-align: middle; }
+.sub-table tr:last-child td { border-bottom: none; }
+.sub-name { font-size: 12px; color: #7080a0; }
+.sub-source { font-size: 9px; color: #1a2440; display: block; margin-top: 1px; }
+.sub-amt { font-size: 11px; color: #2a3458; text-align: right; white-space: nowrap; }
+.dot {
+  width: 26px; height: 22px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; margin: 0 auto;
+}
+.dot-on      { background: #071a0e; color: #34d399; }
+.dot-alert   { background: #1a0707; color: #f87171; }
+.dot-off     { background: #080b14; color: #1a2440; font-size: 12px; }
+.dot-unknown { background: #1a1000; color: #fbbf24; font-size: 9px; }
+.stbadge {
+  font-size: 10px; font-weight: 700; white-space: nowrap;
+  padding: 3px 8px; border-radius: 6px; display: inline-block;
+}
+.st-alert { background: #1a0707; color: #f87171; }
+.st-warn  { background: #1a1000; color: #fbbf24; }
+.st-ok    { background: #071a0e; color: #34d399; }
+.st-grey  { background: #080c14; color: #1e2840; }
+
+/* Sub summary */
+.sub-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.summary-card {
+  border-radius: 14px; padding: 14px 16px; text-align: center;
+}
+.summary-card.bad  { background: #130606; border: 1px solid #3a1010; }
+.summary-card.good { background: #060f0a; border: 1px solid #0d3020; }
+.summary-num { font-size: 26px; font-weight: 900; line-height: 1; }
+.summary-num.bad  { color: #f87171; }
+.summary-num.good { color: #34d399; }
+.summary-label { font-size: 10px; color: #3a4060; margin-top: 4px; }
+.summary-detail { font-size: 11px; margin-top: 6px; }
+.summary-detail.bad  { color: #5a2020; }
+.summary-detail.good { color: #1a4030; }
+
+/* Monthly grid */
+.mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.mcell {
+  background: #090c18; border-radius: 12px;
+  padding: 12px 10px 10px; border-left: 3px solid;
+  cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+  min-height: 70px;
+}
+.mcell:active { opacity: 0.7; transform: scale(0.96); }
+.mcell-lbl { font-size: 9px; color: #2a3458; margin-bottom: 4px; }
+.mcell-val { font-size: 13px; font-weight: 800; line-height: 1.1; }
+.mcell-z { font-size: 9px; color: #1a2440; margin-top: 3px; }
+.c-anomaly { border-color: #ef4444; }
+.c-high    { border-color: #f59e0b; }
+.c-normal  { border-color: #3b82f6; }
+.c-low     { border-color: #34d399; }
+
+/* Drill */
+.drill {
+  background: #090c18; border: 1px solid #101828;
+  border-radius: 14px; padding: 16px 16px;
+  margin-top: 10px; display: none;
+}
+.drill.open { display: block; }
+.drill-title { font-size: 12px; font-weight: 700; color: #60a5fa; margin-bottom: 12px; }
+.drill-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.drill-cat { font-size: 10px; color: #3a4d70; width: 80px; flex-shrink: 0; text-align: right; }
+.drill-track { flex: 1; height: 5px; background: #060810; border-radius: 3px; overflow: hidden; }
+.drill-fill { height: 100%; border-radius: 3px; }
+.drill-val { font-size: 10px; font-weight: 700; width: 46px; flex-shrink: 0; text-align: right; }
+
+/* Tabs (within screen) */
+.inner-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+.inner-tab {
+  padding: 7px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent;
+  transition: all 0.15s; min-height: 36px;
+  display: flex; align-items: center;
+}
+.inner-tab.active { background: #141e3a; border-color: #1e3060; color: #60a5fa; }
+.inner-tab:not(.active) { color: #2a3458; }
+
+/* Stat row */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat {
+  background: #090c18; border: 1px solid #0e1220;
+  border-radius: 12px; padding: 12px 14px;
+}
+.stat-lbl { font-size: 9px; color: #2a3458; margin-bottom: 4px; letter-spacing: 0.3px; }
+.stat-val { font-size: 18px; font-weight: 800; }
+.stat-note { font-size: 9px; color: #1a2440; margin-top: 2px; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RESPONSIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media (max-width: 400px) {
+  .screen { padding: 16px 16px 100px; }
+  .screen-title { font-size: 20px; }
+  .kpi { width: 175px; }
+}
+@media (hover: none) {
+  .mcell:hover { opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">家計ダッシュボード</div>
+      <div class="topbar-sub">Moneytree + PayPay ｜ 更新 2026/04/05</div>
+    </div>
+    <div class="topbar-badge" id="alertBadge">⚠️ 要確認</div>
+  </div>
+
+  <!-- SCREENS -->
+  <div class="screens">
+
+    <!-- ════════════════════════════════════
+         SCREEN 1: 今月
+    ════════════════════════════════════ -->
+    <div class="screen active" id="screen-home">
+
+      <div class="screen-header">
+        <div class="screen-eyebrow">Goal A</div>
+        <div class="screen-title">今月はどう？</div>
+        <div class="screen-desc">統計ベースとの比較で「普通の月かどうか」を確認する</div>
+      </div>
+
+      <!-- ALERT -->
+      <div class="alert">
+        <div class="alert-head">
+          <div class="alert-icon">⚠️</div>
+          <div>
+            <div class="alert-title">使ってないのに請求中</div>
+            <div class="alert-sub">2026年1〜4月、毎月確認されています → 棚卸し画面で詳細確認</div>
+          </div>
+        </div>
+        <div class="alert-services">
+          <div class="alert-svc">
+            <div class="alert-svc-name">Netflix</div>
+            <div class="alert-svc-detail">¥890 × 4ヶ月 = ¥3,560</div>
+          </div>
+          <div class="alert-svc">
+            <div class="alert-svc-name">FOD</div>
+            <div class="alert-svc-detail">¥1,320 × 4ヶ月 = ¥5,280</div>
+          </div>
+        </div>
+        <div class="alert-action">解約で <strong>¥2,210/月・年間¥26,520</strong> の節約</div>
+      </div>
+
+      <!-- 2026 KPI cards -->
+      <div class="card-title" style="margin-bottom:10px;font-size:10px;font-weight:700;color:#2a3458;letter-spacing:1.5px;text-transform:uppercase;">2026年 月次サマリー</div>
+      <div class="kpi-scroll" id="kpiScroll"></div>
+
+      <!-- Timeline chart -->
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">📈 支出タイムライン｜2025〜2026</div>
+        <div class="card-sub">σバンドの外が「要注意」ゾーン</div>
+        <div style="position:relative;height:220px;width:100%;">
+          <canvas id="chartTimeline"></canvas>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3b82f666;"></div>2025年</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>2026年</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34d39930;"></div>±1σ 通常</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ef444428;"></div>±2σ</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">📐 2025年ベースライン統計</div>
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="stat-lbl">月平均（通常10ヶ月）</div>
+            <div class="stat-val" style="color:#34d399;">¥30.4万</div>
+            <div class="stat-note">異常値除外後</div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl">標準偏差 σ</div>
+            <div class="stat-val" style="color:#a78bfa;">¥9.5万</div>
+            <div class="stat-note">通常10ヶ月</div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl">通常範囲（±1σ）</div>
+            <div class="stat-val" style="color:#60a5fa;font-size:14px;padding-top:2px;">¥21〜¥40万</div>
+            <div class="stat-note">これが「普通」</div>
+          </div>
+          <div class="stat">
+            <div class="stat-lbl">2026年の状態</div>
+            <div class="stat-val" style="color:#34d399;font-size:15px;padding-top:2px;">全月正常</div>
+            <div class="stat-note">3ヶ月±1σ内</div>
+          </div>
+        </div>
+        <div class="note">3月は住民税¥149,540を含む。税抜きなら¥20.8万で±1σ下限とほぼ同水準。</div>
+      </div>
+
+      <!-- 予算ロジックカード -->
+      <div class="card">
+        <div class="card-title">💰 月間予算ロジック</div>
+        <div class="card-sub">NISA積立¥100,000/月は本データから除外済み。固定費・変動費・特別費の3区分で管理。</div>
+
+        <!-- 変動費ターゲット -->
+        <div style="border-bottom:1px solid #101828;padding-bottom:14px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:700;color:#3a4d70;">変動費 月次目標</span>
+            <span style="font-size:22px;font-weight:900;color:#34d399;">¥150,000</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span style="color:#3a4d70;">交際費（PayPay含む）</span>
+              <span style="color:#2a3458;">¥10,000 × 4回 = <span style="color:#60a5fa;font-weight:700;">¥40,000</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span style="color:#3a4d70;">電車・交通</span>
+              <span style="color:#2a3458;">2025実績平均 → <span style="color:#60a5fa;font-weight:700;">¥40,000</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span style="color:#3a4d70;">食費</span>
+              <span style="color:#2a3458;">¥600 × 30日 = <span style="color:#60a5fa;font-weight:700;">¥18,000</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span style="color:#3a4d70;">日用品・美容ケア</span>
+              <span style="color:#2a3458;"><span style="color:#60a5fa;font-weight:700;">¥20,000</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;border-top:1px dashed #101828;padding-top:6px;margin-top:2px;">
+              <span style="color:#3a4d70;">その他・バッファ</span>
+              <span style="color:#2a3458;"><span style="color:#60a5fa;font-weight:700;">¥32,000</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 固定費リスト -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+            <span style="font-size:12px;font-weight:700;color:#3a4d70;">固定費（実績 ~¥50,000/月）</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">
+            <span style="font-size:10px;background:#090c18;border:1px solid #141a2e;border-radius:6px;padding:3px 8px;color:#3a4d70;">実家送金 ¥25,000〜</span>
+            <span style="font-size:10px;background:#090c18;border:1px solid #141a2e;border-radius:6px;padding:3px 8px;color:#3a4d70;">docomo ¥1,060</span>
+            <span style="font-size:10px;background:#090c18;border:1px solid #141a2e;border-radius:6px;padding:3px 8px;color:#3a4d70;">Netflix ¥890</span>
+            <span style="font-size:10px;background:#090c18;border:1px solid #141a2e;border-radius:6px;padding:3px 8px;color:#3a4d70;">FOD ¥1,320</span>
+            <span style="font-size:10px;background:#090c18;border:1px solid #141a2e;border-radius:6px;padding:3px 8px;color:#3a4d70;">Amazon ¥600</span>
+            <span style="font-size:10px;background:#090c18;border:1px solid #141a2e;border-radius:6px;padding:3px 8px;color:#3a4d70;">Claude.ai ¥3,258</span>
+            <span style="font-size:10px;background:#1a1000;border:1px solid #3a2800;border-radius:6px;padding:3px 8px;color:#fbbf24;">Gemini ¥3,000 ⚠️データ外</span>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:12px;">
+          <strong>特別費（美容・整形・税金・旅行等）は別途計上</strong> ｜ 月次グリッドの異常値は大半が特別費起因
+        </div>
+      </div>
+
+    </div><!-- /screen-home -->
+
+    <!-- ════════════════════════════════════
+         SCREEN 2: 棚卸し
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-sub">
+
+      <div class="screen-header">
+        <div class="screen-eyebrow">Goal B</div>
+        <div class="screen-title">サブスク棚卸し</div>
+        <div class="screen-desc">毎月何が請求されているかを追跡。気づかず払い続けているものをゼロにする。</div>
+      </div>
+
+      <!-- Summary -->
+      <div class="sub-summary">
+        <div class="summary-card bad">
+          <div class="summary-num bad">2</div>
+          <div class="summary-label">要解約サービス</div>
+          <div class="summary-detail bad">Netflix + FOD<br>¥2,210/月</div>
+        </div>
+        <div class="summary-card good">
+          <div class="summary-num good">3</div>
+          <div class="summary-label">解約確認済み</div>
+          <div class="summary-detail good">Disney+ / Yahoo! /<br>楽天モバイル</div>
+        </div>
+      </div>
+      <!-- データ外サービス注意書き -->
+      <div style="background:#0f0d00;border:1px solid #3a2800;border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-size:16px;">⚠️</span>
+          <span style="font-size:13px;font-weight:700;color:#fbbf24;">データ外サービス（手動把握）</span>
+        </div>
+        <div style="font-size:11px;color:#7a6020;line-height:1.7;">
+          <strong style="color:#a07830;">Gemini ¥3,000/月</strong> — Moneytree未連携カードで請求。データには現れないため手動で把握。<br>
+          月次データとは別に固定費として計上する必要あり。
+        </div>
+      </div>
+
+      <!-- Tracker -->
+      <div class="card">
+        <div class="card-title">月次請求トラッカー</div>
+        <div class="card-sub">
+          <span style="color:#34d399;">●</span> 請求中 &nbsp;
+          <span style="color:#f87171;">●</span> 使ってないのに請求中 &nbsp;
+          <span style="color:#fbbf24;">？</span> データ外（手動把握） &nbsp;
+          <span style="color:#1e2840;">−</span> なし/解約済み
+        </div>
+        <div class="sub-wrap">
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th class="th-l" style="min-width:110px;">サービス</th>
+                <th>月額</th>
+                <th colspan="4" style="color:#1a2440; letter-spacing:0;">─ 2025 ─</th>
+                <th colspan="4" style="color:#243060; letter-spacing:0;">─ 2026 ─</th>
+                <th>状態</th>
+              </tr>
+              <tr>
+                <th class="th-l"></th><th></th>
+                <th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>
+                <th>1</th><th>2</th><th>3</th><th>4</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="subBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 解約済み解説 -->
+      <div class="card">
+        <div class="card-title">✅ 解約済みの確認</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+          <div style="background:#060f0a;border:1px solid #0d2818;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:12px;font-weight:700;color:#34d399;">Disney+（¥957/月）</div>
+            <div style="font-size:11px;color:#1a4030;margin-top:4px;">2026年1〜3月のMoneytree・PayPay両方に請求なし。解約済みと判断。</div>
+          </div>
+          <div style="background:#060f0a;border:1px solid #0d2818;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:12px;font-weight:700;color:#34d399;">Yahoo!プレミアム（¥508/月）</div>
+            <div style="font-size:11px;color:#1a4030;margin-top:4px;">2026年PayPay CSVに請求なし。解約済みと判断。</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /screen-sub -->
+
+    <!-- ════════════════════════════════════
+         SCREEN 3: 履歴
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-history">
+
+      <div class="screen-header">
+        <div class="screen-eyebrow">Goal A ｜ 2025年</div>
+        <div class="screen-title">月次履歴</div>
+        <div class="screen-desc">各月をタップして「なぜ多かったか」の内訳を確認する</div>
+      </div>
+
+      <!-- Inner tabs -->
+      <div class="inner-tabs">
+        <div class="inner-tab active" onclick="switchInner(this,'history-grid')">🗓 月次グリッド</div>
+        <div class="inner-tab" onclick="switchInner(this,'history-stack')">📊 3分類</div>
+      </div>
+
+      <!-- Grid panel -->
+      <div id="history-grid">
+        <div class="card" style="margin-bottom:10px;">
+          <div class="mgrid" id="mgrid"></div>
+          <div class="drill" id="drill">
+            <div class="drill-title" id="drillTitle"></div>
+            <div id="drillBars"></div>
+          </div>
+        </div>
+        <div class="note">
+          <strong>🚨 赤:</strong> 3月・6月（美容¥76万・¥50万）σ除外 ｜
+          <strong>⚠️ 黄:</strong> 5月・7月（税金含む）
+        </div>
+      </div>
+
+      <!-- Stack panel -->
+      <div id="history-stack" style="display:none;">
+        <div class="card">
+          <div class="card-title">📊 固定費・変動費・特別費 推移</div>
+          <div style="position:relative;height:240px;width:100%;">
+          <canvas id="chartStack"></canvas>
+        </div>
+          <div class="legend" style="margin-top:12px;">
+            <div class="legend-item"><div class="legend-dot" style="background:#3b82f6aa;"></div>固定費</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#34d399aa;"></div>変動費</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f59e0baa;"></div>特別費</div>
+          </div>
+        </div>
+        <div class="note">
+          <strong>固定費:</strong> 実家送金・docomo・サブスク（Netflix/FOD/Amazon/Claude等）｜
+          <strong>特別費:</strong> 税金・美容整形・家電・旅行・臨時 ｜
+          <strong>変動費:</strong> 交際費（PayPay含む）・交通・食費・日用品
+        </div>
+      </div>
+
+    </div><!-- /screen-history -->
+
+  </div><!-- /screens -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="nav">
+    <button class="nav-item active" onclick="goScreen('home',this)">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">今月</div>
+      <div class="nav-dot"></div>
+    </button>
+    <button class="nav-item" onclick="goScreen('sub',this)">
+      <div class="nav-icon">🔍</div>
+      <div class="nav-label">棚卸し</div>
+      <div class="nav-dot"></div>
+    </button>
+    <button class="nav-item" onclick="goScreen('history',this)">
+      <div class="nav-icon">📅</div>
+      <div class="nav-label">履歴</div>
+      <div class="nav-dot"></div>
+    </button>
+  </nav>
+
+</div><!-- /app -->
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     SCRIPT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<script>
+// ── DATA ──
+const M25 = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const T25 = [239724,397371,971733,173539,422806,737275,485928,216958,272557,243861,306973,276772];
+const T26 = [256397,240484,357266];
+const ANOMALY = [2,5];
+
+const F25 = [68242,59455,56279,60834,52431,46881,62533,44624,60980,60301,53702,52253];
+const S25 = [95530,251333,792939,70350,137275,520130,216022,50764,23033,56825,135459,121221];
+const V25 = T25.map((t,i)=>t-F25[i]-S25[i]);
+const F26 = [50448,47368,51731];
+const S26 = [26578,38115,149540];
+const V26 = T26.map((t,i)=>t-F26[i]-S26[i]);
+
+const norm = T25.filter((_,i)=>!ANOMALY.includes(i));
+const μ = norm.reduce((a,b)=>a+b)/norm.length;
+const σ = Math.sqrt(norm.reduce((s,v)=>s+(v-μ)**2,0)/norm.length);
+
+// ━━━━━━━━ NAVIGATION ━━━━━━━━
+let currentScreen = 'home';
+const prevPositions = {};
+
+function goScreen(id, btn) {
+  if(id === currentScreen) return;
+  const prev = document.getElementById('screen-'+currentScreen);
+  const next = document.getElementById('screen-'+id);
+
+  // Determine direction
+  const order = ['home','sub','history'];
+  const prevIdx = order.indexOf(currentScreen);
+  const nextIdx = order.indexOf(id);
+  const goRight = nextIdx > prevIdx;
+
+  // Save scroll
+  prevPositions[currentScreen] = prev.scrollTop;
+
+  // Animate out
+  prev.classList.remove('active');
+  prev.style.transform = goRight ? 'translateX(-40px)' : 'translateX(40px)';
+  prev.style.opacity = '0';
+  prev.style.pointerEvents = 'none';
+
+  // Prepare next
+  next.style.transform = goRight ? 'translateX(40px)' : 'translateX(-40px)';
+  next.style.opacity = '0';
+  next.style.pointerEvents = 'none';
+  next.style.display = 'block';
+
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      next.style.transition = 'opacity 0.22s ease, transform 0.22s ease';
+      next.style.transform = 'translateX(0)';
+      next.style.opacity = '1';
+      next.style.pointerEvents = 'auto';
+      next.classList.add('active');
+      // Restore scroll
+      if(prevPositions[id] !== undefined) next.scrollTop = prevPositions[id];
+    });
+  });
+
+  setTimeout(()=>{
+    prev.style.transform = '';
+    prev.style.opacity = '';
+    prev.style.transition = '';
+  }, 250);
+
+  // Nav buttons
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentScreen = id;
+}
+
+function switchInner(el, panelId) {
+  document.querySelectorAll('.inner-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#history-grid,#history-stack').forEach(p=>p.style.display='none');
+  document.getElementById(panelId).style.display = 'block';
+  // lazy-init stack chart
+  if(panelId === 'history-stack' && !stackInited) initStackChart();
+}
+
+// ━━━━━━━━ KPI CARDS ━━━━━━━━
+(function(){
+  const cfgs = [
+    { month:'2026年 1月', total:256397, f:50448, v:179371, s:26578, prev:239724 },
+    { month:'2026年 2月', total:240484, f:47368, v:155001, s:38115, prev:397371 },
+    { month:'2026年 3月', total:357266, f:51731, v:155995, s:149540, prev:971733 },
+  ];
+  const cols = ['#fbbf24','#34d399','#60a5fa'];
+  const cont = document.getElementById('kpiScroll');
+  cfgs.forEach((d,i)=>{
+    const z=(d.total-μ)/σ;
+    const zStr=(z>=0?'+':'')+z.toFixed(2);
+    const yoy=Math.round((d.total/d.prev-1)*100);
+    const zCls = z>1?'zbadge-alert': z<-0.5?'zbadge-ok': 'zbadge-blue';
+    const pct = n=>Math.round(n/d.total*100);
+    cont.innerHTML+=`
+      <div class="kpi">
+        <div class="kpi-month">${d.month}</div>
+        <div class="kpi-amount" style="color:${cols[i]};">
+          ¥${(d.total/10000).toFixed(1)}<span>万</span>
+        </div>
+        <div class="kpi-z">
+          <span class="zbadge ${zCls}">z ${zStr}</span>
+          <span style="font-size:10px;color:#2a3458;">${yoy>=0?'+':''}${yoy}%</span>
+        </div>
+        <div class="kpi-bars">
+          <div class="kpi-bar-row">
+            <div class="kpi-bar-lbl">固定費</div>
+            <div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:${pct(d.f)}%;background:#3b82f6;"></div></div>
+            <div class="kpi-bar-val" style="color:#3b82f6;">¥${Math.round(d.f/1000)}K</div>
+          </div>
+          <div class="kpi-bar-row">
+            <div class="kpi-bar-lbl">変動費</div>
+            <div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:${pct(d.v)}%;background:#34d399;"></div></div>
+            <div class="kpi-bar-val" style="color:#34d399;">¥${Math.round(d.v/1000)}K</div>
+          </div>
+          <div class="kpi-bar-row">
+            <div class="kpi-bar-lbl">特別費</div>
+            <div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:${pct(d.s)}%;background:#f59e0b;"></div></div>
+            <div class="kpi-bar-val" style="color:#f59e0b;">¥${Math.round(d.s/1000)}K</div>
+          </div>
+        </div>
+      </div>`;
+  });
+})();
+
+// ━━━━━━━━ TIMELINE CHART ━━━━━━━━
+(function(){
+  const short = M25.map(m=>'25/'+m.replace('月',''));
+  const labels = [...short,'26/1','26/2','26/3'];
+  const bc25 = T25.map((v,i)=> ANOMALY.includes(i)?'#ef444455': v>μ+σ?'#f59e0b55': v<μ-σ?'#34d39940':'#3b82f640');
+  const brd25 = T25.map((v,i)=> ANOMALY.includes(i)?'#ef4444': v>μ+σ?'#f59e0b': v<μ-σ?'#34d399':'#3b82f6');
+  new Chart(document.getElementById('chartTimeline'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'±2σ上',type:'line',data:labels.map(()=>μ+2*σ),borderColor:'#ef444420',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false,backgroundColor:'transparent'},
+      {label:'±2σ下',type:'line',data:labels.map(()=>Math.max(0,μ-2*σ)),borderColor:'#ef444420',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:'-1',backgroundColor:'#ef44440a'},
+      {label:'±1σ上',type:'line',data:labels.map(()=>μ+σ),borderColor:'#34d39930',borderDash:[3,3],borderWidth:1.5,pointRadius:0,fill:false,backgroundColor:'transparent'},
+      {label:'±1σ下',type:'line',data:labels.map(()=>Math.max(0,μ-σ)),borderColor:'#34d39930',borderDash:[3,3],borderWidth:1.5,pointRadius:0,fill:'-1',backgroundColor:'#34d3990c'},
+      {label:'平均',type:'line',data:labels.map(()=>μ),borderColor:'#34d39940',borderDash:[8,4],borderWidth:1.5,pointRadius:0,fill:false,backgroundColor:'transparent'},
+      {label:'2025年',data:[...T25,null,null,null],backgroundColor:bc25,borderColor:brd25,borderWidth:1.5,borderRadius:3},
+      {label:'2026年',data:[...T25.map(()=>null),...T26],backgroundColor:'#fbbf2470',borderColor:'#fbbf24',borderWidth:2,borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
+      if(ctx.parsed.y===null)return null;
+      const skip=['±2σ上','±2σ下','±1σ上','±1σ下','平均'];
+      return skip.includes(ctx.dataset.label)?null:` ¥${Math.round(ctx.parsed.y).toLocaleString()}`;
+    }}}},scales:{
+      x:{grid:{color:'#0e1220'},ticks:{color:'#1e2840',font:{size:9},maxRotation:45}},
+      y:{grid:{color:'#0e1220'},ticks:{color:'#2a3458',font:{size:9},callback:v=>`¥${(v/10000).toFixed(0)}万`}}
+    }}
+  });
+})();
+
+// ━━━━━━━━ SUBSCRIPTION TRACKER ━━━━━━━━
+(function(){
+  const rows=[
+    {name:'Netflix',     src:'PayPay',  amt:'¥890',   q25:[1,1,1,1],m26:[2,2,2,2],st:'alert',stl:'🚨 未解約'},
+    {name:'FOD',         src:'PayPay',  amt:'¥1,320', q25:[1,1,1,1],m26:[2,2,2,2],st:'alert',stl:'🚨 未解約'},
+    {name:'Disney+',     src:'docomo',  amt:'¥957',   q25:[1,1,1,1],m26:[0,0,0,0],st:'ok',   stl:'✅ 解約済'},
+    {name:'Yahoo!プレミ',src:'PayPay',  amt:'¥508',   q25:[1,1,1,1],m26:[0,0,0,0],st:'ok',   stl:'✅ 解約済'},
+    {name:'Gemini',      src:'※データ外',amt:'¥3,000',q25:[0,0,0,0],m26:[3,3,3,3],st:'warn', stl:'⚠️ 手動把握'},
+    {name:'Amazon Prime',src:'カード',  amt:'¥600',   q25:[1,1,1,1],m26:[1,1,1,1],st:'ok',   stl:'✅ 継続'},
+    {name:'Apple',       src:'カード',  amt:'変動',   q25:[1,1,1,1],m26:[1,1,1,1],st:'ok',   stl:'✅ 継続'},
+    {name:'docomo',      src:'Moneytree',amt:'¥1,060',q25:[0,0,0,0],m26:[0,1,1,1],st:'ok',   stl:'✅ 継続'},
+    {name:'楽天モバイル',src:'解約済',  amt:'¥3,315', q25:[0,0,0,1],m26:[0,0,0,0],st:'grey', stl:'解約済'},
+    {name:'AU (iPhone)', src:'カード',  amt:'¥343',   q25:[1,1,1,1],m26:[1,1,1,1],st:'ok',   stl:'✅ 継続'},
+    {name:'SoftBank',    src:'解約済',  amt:'—',      q25:[1,0,0,0],m26:[0,0,0,0],st:'grey', stl:'解約済'},
+    {name:'UQモバイル',  src:'解約済',  amt:'—',      q25:[0,1,1,0],m26:[0,0,0,0],st:'grey', stl:'解約済'},
+    {name:'Cursor',      src:'カード',  amt:'¥2,850', q25:[0,0,1,1],m26:[0,0,0,0],st:'grey', stl:'停止中'},
+    {name:'Claude.ai',   src:'カード',  amt:'¥3,258', q25:[0,0,0,0],m26:[0,0,1,1],st:'ok',   stl:'✅ 継続'},
+  ];
+  const dh=v=>v===2?`<div class="dot dot-alert">●</div>`:v===3?`<div class="dot dot-unknown">？</div>`:v===1?`<div class="dot dot-on">●</div>`:`<div class="dot dot-off">−</div>`;
+  const tb=document.getElementById('subBody');
+  rows.forEach(r=>{
+    const sc=r.st==='alert'?'st-alert':r.st==='warn'?'st-warn':r.st==='ok'?'st-ok':'st-grey';
+    tb.innerHTML+=`<tr>
+      <td><span class="sub-name">${r.name}<span class="sub-source">${r.src}</span></span></td>
+      <td class="sub-amt">${r.amt}</td>
+      ${r.q25.map(v=>`<td>${dh(v)}</td>`).join('')}
+      ${r.m26.map(v=>`<td>${dh(v)}</td>`).join('')}
+      <td><span class="stbadge ${sc}">${r.stl}</span></td>
+    </tr>`;
+  });
+})();
+
+// ━━━━━━━━ MONTHLY GRID + DRILL ━━━━━━━━
+(function(){
+  const cats={
+    'PayPay実支出':[41938,69030,20364,7210,65279,50257,46819,31903,20033,2158,51342,37879],
+    '電車・交通':  [40000,40000,63014,38601,41597,77364,84221,46655,64165,84607,57298,40000],
+    '美容':        [0,100000,762215,11100,0,501660,0,0,0,0,0,35124],
+    '電化製品':    [79140,92948,14334,42860,12323,2080,31372,23774,6643,0,0,0],
+    '食費':        [0,5446,46680,17404,11521,77340,63342,34959,37953,21858,11745,0],
+    '税金':        [0,0,0,0,67562,0,150640,0,0,0,133329,0],
+    '未定':        [16390,58385,16390,16390,57390,16390,19690,16390,16390,16390,2130,57547],
+    'WEBサービス': [13878,15098,13228,19220,10158,4498,20398,4498,19754,19075,12476,10457],
+    'ホテル・旅行':[0,0,0,0,0,0,14320,10600,0,40435,0,28550],
+    '携帯電話':    [15664,5657,4351,2914,3573,3683,3435,1426,2526,2526,2526,3096],
+  };
+  const pal=['#ef4444','#60a5fa','#f87171','#a78bfa','#34d399','#fbbf24','#6b7280','#06b6d4','#f97316','#8b5cf6'];
+  const grid=document.getElementById('mgrid');
+  let openIdx=-1;
+
+  M25.forEach((m,i)=>{
+    const v=T25[i], z=(v-μ)/σ;
+    const ia=ANOMALY.includes(i);
+    const cls=ia?'c-anomaly':z>1?'c-high':z<-0.7?'c-low':'c-normal';
+    const col=ia?'#f87171':z>1?'#fbbf24':z<-0.7?'#34d399':'#60a5fa';
+    const cell=document.createElement('div');
+    cell.className=`mcell ${cls}`;
+    cell.innerHTML=`<div class="mcell-lbl">${m}</div><div class="mcell-val" style="color:${col};">¥${(v/10000).toFixed(1)}<span style="font-size:8px;">万</span></div><div class="mcell-z">z ${z>=0?'+':''}${z.toFixed(1)}</div>`;
+    cell.addEventListener('click',()=>{
+      const dr=document.getElementById('drill');
+      if(openIdx===i){dr.classList.remove('open');openIdx=-1;return;}
+      openIdx=i;
+      const entries=Object.entries(cats).map(([k,a])=>[k,a[i]]).filter(([,a])=>a>0).sort((a,b)=>b[1]-a[1]);
+      const mx=entries[0]?.[1]||1;
+      document.getElementById('drillTitle').textContent=`${m}（¥${v.toLocaleString()}）の内訳`;
+      document.getElementById('drillBars').innerHTML=entries.map(([k,a],ci)=>
+        `<div class="drill-row">
+          <div class="drill-cat">${k}</div>
+          <div class="drill-track"><div class="drill-fill" style="width:${Math.round(a/mx*100)}%;background:${pal[ci%pal.length]}88;"></div></div>
+          <div class="drill-val" style="color:${pal[ci%pal.length]};">¥${Math.round(a/1000)}K</div>
+        </div>`).join('');
+      dr.classList.add('open');
+      setTimeout(()=>dr.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+    });
+    grid.appendChild(cell);
+  });
+})();
+
+// ━━━━━━━━ STACK CHART (lazy) ━━━━━━━━
+let stackInited=false;
+function initStackChart(){
+  if(stackInited)return;
+  stackInited=true;
+  const short=M25.map(m=>'25/'+m.replace('月',''));
+  const labels=[...short,'26/1','26/2','26/3'];
+  new Chart(document.getElementById('chartStack'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'固定費',data:[...F25,...F26],backgroundColor:'#3b82f6aa',borderRadius:2},
+      {label:'変動費',data:[...V25,...V26],backgroundColor:'#34d399aa'},
+      {label:'特別費',data:[...S25,...S26],backgroundColor:'#f59e0baa'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{
+      afterBody:items=>[`合計: ¥${items.reduce((s,i)=>s+i.parsed.y,0).toLocaleString()}`]
+    }}},scales:{
+      x:{stacked:true,grid:{color:'#0e1220'},ticks:{color:'#1e2840',font:{size:9},maxRotation:45}},
+      y:{stacked:true,grid:{color:'#0e1220'},ticks:{color:'#2a3458',font:{size:9},callback:v=>`¥${(v/10000).toFixed(0)}万`}}
+    }}
+  });
+}
+</script>
+</body>
+</html>
