@@ -860,6 +860,12 @@ function switchInner(el, panelId) {
   const grid=document.getElementById('mgrid');
   let openIdx=-1;
 
+  // 2025年セクションヘッダー
+  const hdr25=document.createElement('div');
+  hdr25.style.cssText='grid-column:1/-1;font-size:10px;font-weight:700;color:#2a3458;letter-spacing:1.5px;padding:4px 0 2px;';
+  hdr25.textContent='─ 2025 ─';
+  grid.appendChild(hdr25);
+
   M25.forEach((m,i)=>{
     const v=T25[i], z=(v-μ)/σ;
     const ia=ANOMALY.includes(i);
@@ -881,6 +887,39 @@ function switchInner(el, panelId) {
           <div class="drill-track"><div class="drill-fill" style="width:${Math.round(a/mx*100)}%;background:${pal[ci%pal.length]}88;"></div></div>
           <div class="drill-val" style="color:${pal[ci%pal.length]};">¥${Math.round(a/1000)}K</div>
         </div>`).join('');
+      dr.classList.add('open');
+      setTimeout(()=>dr.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+    });
+    grid.appendChild(cell);
+  });
+
+  // 2026年セクションヘッダー
+  const hdr26=document.createElement('div');
+  hdr26.style.cssText='grid-column:1/-1;font-size:10px;font-weight:700;color:#243060;letter-spacing:1.5px;padding:8px 0 2px;';
+  hdr26.textContent='─ 2026 ─';
+  grid.appendChild(hdr26);
+
+  const M26=['1月','2月','3月'];
+  M26.forEach((m,i)=>{
+    const v=T26[i], z=(v-μ)/σ;
+    const cls=z>1?'c-high':z<-0.7?'c-low':'c-normal';
+    const col=z>1?'#fbbf24':z<-0.7?'#34d399':'#60a5fa';
+    const cell=document.createElement('div');
+    cell.className=`mcell ${cls}`;
+    cell.style.borderColor='#fbbf2440';
+    cell.innerHTML=`<div class="mcell-lbl" style="color:#fbbf2488;">26/${m}</div><div class="mcell-val" style="color:${col};">¥${(v/10000).toFixed(1)}<span style="font-size:8px;">万</span></div><div class="mcell-z">z ${z>=0?'+':''}${z.toFixed(1)}</div>`;
+    cell.addEventListener('click',()=>{
+      const dr=document.getElementById('drill');
+      if(openIdx===100+i){dr.classList.remove('open');openIdx=-1;return;}
+      openIdx=100+i;
+      const f=F26[i], s=S26[i], vv=V26[i];
+      document.getElementById('drillTitle').textContent=`2026年${m}（¥${v.toLocaleString()}）の内訳`;
+      document.getElementById('drillBars').innerHTML=[
+        ['変動費',vv,'#34d399'],['固定費',f,'#3b82f6'],['特別費',s,'#f59e0b']
+      ].filter(([,a])=>a>0).map(([k,a,c])=>{
+        const mx=Math.max(vv,f,s)||1;
+        return `<div class="drill-row"><div class="drill-cat">${k}</div><div class="drill-track"><div class="drill-fill" style="width:${Math.round(a/mx*100)}%;background:${c}88;"></div></div><div class="drill-val" style="color:${c};">¥${Math.round(a/1000)}K</div></div>`;
+      }).join('');
       dr.classList.add('open');
       setTimeout(()=>dr.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
     });
