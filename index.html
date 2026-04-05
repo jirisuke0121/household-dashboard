@@ -672,8 +672,9 @@ function maybeInitStack() { if(!stackInited) initStackChart(); }
   const f=F26[mi], v=V26[mi];
 
   // 年間特別費プール（税金除き）
+  const tax26=[0,0,149540]; // cats26['税金'] — cats26はこの時点で未定義のためインライン定義
   const totalS=S26.reduce((a,b)=>a+b,0);
-  const totalTax=S26.reduce((s,_,i)=>s+(cats26['税金']?.[i]||0),0);
+  const totalTax=S26.reduce((s,_,i)=>s+(tax26[i]||0),0);
   const poolUsed=totalS-totalTax;
   const poolPct=Math.min(Math.round(poolUsed/POOL*100),100);
 
