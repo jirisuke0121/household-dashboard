@@ -386,55 +386,12 @@ body {
         <div class="alert-action">解約で <strong>¥2,210/月・年間¥26,520</strong> の節約</div>
       </div>
 
-      <!-- 2026 KPI cards -->
-      <div class="card-title" style="margin-bottom:10px;font-size:10px;font-weight:700;color:#2a3458;letter-spacing:1.5px;text-transform:uppercase;">2026年 月次サマリー</div>
-      <div class="kpi-scroll" id="kpiScroll"></div>
-
-      <!-- Timeline chart -->
-      <div class="card" style="margin-top:14px;">
-        <div class="card-title">📈 支出タイムライン｜2025〜2026</div>
-        <div class="card-sub">σバンドの外が「要注意」ゾーン</div>
-        <div style="position:relative;height:220px;width:100%;">
-          <canvas id="chartTimeline"></canvas>
-        </div>
-        <div class="legend">
-          <div class="legend-item"><div class="legend-dot" style="background:#3b82f666;"></div>2025年</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>2026年</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#34d39930;"></div>±1σ 通常</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#ef444428;"></div>±2σ</div>
-        </div>
-      </div>
-
-      <!-- Stats -->
-      <div class="card">
-        <div class="card-title">📐 2025年ベースライン統計</div>
-        <div class="stat-grid">
-          <div class="stat">
-            <div class="stat-lbl">月平均（通常10ヶ月）</div>
-            <div class="stat-val" style="color:#34d399;">¥30.4万</div>
-            <div class="stat-note">異常値除外後</div>
-          </div>
-          <div class="stat">
-            <div class="stat-lbl">標準偏差 σ</div>
-            <div class="stat-val" style="color:#a78bfa;">¥9.5万</div>
-            <div class="stat-note">通常10ヶ月</div>
-          </div>
-          <div class="stat">
-            <div class="stat-lbl">通常範囲（±1σ）</div>
-            <div class="stat-val" style="color:#60a5fa;font-size:14px;padding-top:2px;">¥21〜¥40万</div>
-            <div class="stat-note">これが「普通」</div>
-          </div>
-          <div class="stat">
-            <div class="stat-lbl">2026年の状態</div>
-            <div class="stat-val" style="color:#34d399;font-size:15px;padding-top:2px;">全月正常</div>
-            <div class="stat-note">3ヶ月±1σ内</div>
-          </div>
-        </div>
-        <div class="note">3月は住民税¥149,540を含む。税抜きなら¥20.8万で±1σ下限とほぼ同水準。</div>
-      </div>
-
       <!-- 予算 vs 実績カード -->
       <div class="card" id="budgetCard"></div>
+
+      <!-- 2026 KPI cards -->
+      <div class="card-title" style="margin:14px 0 10px;font-size:10px;font-weight:700;color:#2a3458;letter-spacing:1.5px;text-transform:uppercase;">2026年 月別サマリー</div>
+      <div class="kpi-scroll" id="kpiScroll"></div>
 
     </div><!-- /screen-home -->
 
@@ -665,27 +622,25 @@ function maybeInitStack() { if(!stackInited) initStackChart(); }
 // ━━━━━━━━ KPI CARDS ━━━━━━━━
 (function(){
   const cfgs = [
-    { month:'2026年 1月', total:256397, f:50448, v:179371, s:26578, prev:239724 },
-    { month:'2026年 2月', total:240484, f:47368, v:155001, s:38115, prev:397371 },
-    { month:'2026年 3月', total:357266, f:51731, v:155995, s:149540, prev:971733 },
+    { month:'1月', f:50448, v:179371, s:26578 },
+    { month:'2月', f:47368, v:155001, s:38115 },
+    { month:'3月', f:51731, v:155995, s:149540 },
   ];
-  const cols = ['#fbbf24','#34d399','#60a5fa'];
   const cont = document.getElementById('kpiScroll');
   cfgs.forEach((d,i)=>{
-    const z=(d.total-μ)/σ;
-    const zStr=(z>=0?'+':'')+z.toFixed(2);
-    const yoy=Math.round((d.total/d.prev-1)*100);
-    const zCls = z>1?'zbadge-alert': z<-0.5?'zbadge-ok': 'zbadge-blue';
-    const pct = n=>Math.round(n/d.total*100);
+    const fv=d.f+d.v;
+    const total=fv+d.s;
+    const ok=fv<=200000;
+    const amtCol=fv>220000?'#f87171':fv>200000?'#fbbf24':'#34d399';
+    const pct=n=>Math.round(n/total*100);
     cont.innerHTML+=`
       <div class="kpi">
-        <div class="kpi-month">${d.month}</div>
-        <div class="kpi-amount" style="color:${cols[i]};">
-          ¥${(d.total/10000).toFixed(1)}<span>万</span>
+        <div class="kpi-month">2026年 ${d.month}</div>
+        <div class="kpi-amount" style="color:${amtCol};">
+          ¥${(total/10000).toFixed(1)}<span>万</span>
         </div>
-        <div class="kpi-z">
-          <span class="zbadge ${zCls}">z ${zStr}</span>
-          <span style="font-size:10px;color:#2a3458;">${yoy>=0?'+':''}${yoy}%</span>
+        <div style="font-size:9px;color:${ok?'#34d399':'#f87171'};margin-bottom:8px;font-weight:700;">
+          ${ok?'✓ 目標内':'▲ 目標超過'}　固定+変動 ¥${Math.round(fv/1000)}K
         </div>
         <div class="kpi-bars">
           <div class="kpi-bar-row">
@@ -778,33 +733,6 @@ function maybeInitStack() { if(!stackInited) initStackChart(); }
     </div>`;
 })();
 
-// ━━━━━━━━ TIMELINE CHART ━━━━━━━━
-(function(){
-  const short = M25.map(m=>'25/'+m.replace('月',''));
-  const labels = [...short,'26/1','26/2','26/3'];
-  const bc25 = T25.map((v,i)=> ANOMALY.includes(i)?'#ef444455': v>μ+σ?'#f59e0b55': v<μ-σ?'#34d39940':'#3b82f640');
-  const brd25 = T25.map((v,i)=> ANOMALY.includes(i)?'#ef4444': v>μ+σ?'#f59e0b': v<μ-σ?'#34d399':'#3b82f6');
-  new Chart(document.getElementById('chartTimeline'),{
-    type:'bar',
-    data:{labels,datasets:[
-      {label:'±2σ上',type:'line',data:labels.map(()=>μ+2*σ),borderColor:'#ef444420',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false,backgroundColor:'transparent'},
-      {label:'±2σ下',type:'line',data:labels.map(()=>Math.max(0,μ-2*σ)),borderColor:'#ef444420',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:'-1',backgroundColor:'#ef44440a'},
-      {label:'±1σ上',type:'line',data:labels.map(()=>μ+σ),borderColor:'#34d39930',borderDash:[3,3],borderWidth:1.5,pointRadius:0,fill:false,backgroundColor:'transparent'},
-      {label:'±1σ下',type:'line',data:labels.map(()=>Math.max(0,μ-σ)),borderColor:'#34d39930',borderDash:[3,3],borderWidth:1.5,pointRadius:0,fill:'-1',backgroundColor:'#34d3990c'},
-      {label:'平均',type:'line',data:labels.map(()=>μ),borderColor:'#34d39940',borderDash:[8,4],borderWidth:1.5,pointRadius:0,fill:false,backgroundColor:'transparent'},
-      {label:'2025年',data:[...T25,null,null,null],backgroundColor:bc25,borderColor:brd25,borderWidth:1.5,borderRadius:3},
-      {label:'2026年',data:[...T25.map(()=>null),...T26],backgroundColor:'#fbbf2470',borderColor:'#fbbf24',borderWidth:2,borderRadius:3},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
-      if(ctx.parsed.y===null)return null;
-      const skip=['±2σ上','±2σ下','±1σ上','±1σ下','平均'];
-      return skip.includes(ctx.dataset.label)?null:` ¥${Math.round(ctx.parsed.y).toLocaleString()}`;
-    }}}},scales:{
-      x:{grid:{color:'#0e1220'},ticks:{color:'#1e2840',font:{size:9},maxRotation:45}},
-      y:{grid:{color:'#0e1220'},ticks:{color:'#2a3458',font:{size:9},callback:v=>`¥${(v/10000).toFixed(0)}万`}}
-    }}
-  });
-})();
 
 // ━━━━━━━━ SUBSCRIPTION TRACKER ━━━━━━━━
 (function(){
