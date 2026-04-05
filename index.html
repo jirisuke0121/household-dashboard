@@ -644,8 +644,10 @@ const T25 = [239724,397371,971733,173539,422806,737275,485928,216958,272557,2438
 const T26 = [256397,240484,357266];
 const ANOMALY = [2,5];
 
-const F25 = [68242,59455,56279,60834,52431,46881,62533,44624,60980,60301,53702,52253];
-const S25 = [95530,251333,792939,70350,137275,520130,216022,50764,23033,56825,135459,121221];
+// ジム月会費(¥16,390相当)を特別費→固定費へ移動（2025年のみ）
+const gymAdj = [16390,16390,16390,16390,1650,16390,16390,16390,16390,16390,2130,0];
+const F25 = [84632,75845,72669,77224,54081,63271,78923,61014,77370,76691,55832,52253];
+const S25 = [79140,234943,776549,53960,135625,503740,199632,34374,6643,40435,133329,121221];
 const V25 = T25.map((t,i)=>t-F25[i]-S25[i]);
 const F26 = [50448,47368,51731];
 const S26 = [26578,38115,149540];
@@ -827,7 +829,7 @@ const cats={
   '電化製品':    [79140,92948,14334,42860,12323,2080,31372,23774,6643,0,0,0],
   '食費':        [0,5446,46680,17404,11521,77340,63342,34959,37953,21858,11745,0],
   '税金':        [0,0,0,0,67562,0,150640,0,0,0,133329,0],
-  '未定':        [16390,58385,16390,16390,57390,16390,19690,16390,16390,16390,2130,57547],
+  '未定':        [0,41995,0,0,55740,0,3300,0,0,0,0,57547],  // ジム分を固定費へ移動済み
   'WEBサービス': [13878,15098,13228,19220,10158,4498,20398,4498,19754,19075,12476,10457],
   'ホテル・旅行':[0,0,0,0,0,0,14320,10600,0,40435,0,28550],
   '携帯電話':    [15664,5657,4351,2914,3573,3683,3435,1426,2526,2526,2526,3096],
@@ -836,6 +838,40 @@ const cats={
 // 2026年カテゴリ内訳（判明分のみ）
 const cats26={
   '税金':[0,0,149540],
+};
+
+// 特別費 取引明細（2025年1〜9月 Moneytreeデータより）
+const sTx25={
+  0:{'電化製品':[['Amazon ×14件',79140]]},
+  1:{
+    '美容':[['シヨウナンビヨウクリニツク',100000]],
+    '電化製品':[['Amazon ×3件',19968],['ビックカメラ相模大野駅店',72980]],
+    '未定':[['シヨウナンビヨウクリニツクホン',41995]]
+  },
+  2:{
+    '美容':[['シヨウナンビヨウゲカクリニツ',602589],['シヨウナンビヨウゲカクリニツ',73826],['セイシンビヨウクリニツク ヨコ',85800]],
+    '電化製品':[['Amazon ×7件',14334]]
+  },
+  3:{
+    '美容':[['ゴウトウデイシエアサロン',11100]],
+    '電化製品':[['Amazon ×10件',42860]]
+  },
+  4:{
+    '税金':[['ネツト フジツウ(カ',67562]],
+    '電化製品':[['Amazon ×4件',12323]],
+    '未定':[['ネツト イ)アイビカイ',55740]]
+  },
+  5:{
+    '美容':[['ヨコハマテイーエークリニツク',501660]],
+    '電化製品':[['Amazon ×1件',2080]]
+  },
+  6:{
+    '税金':[['ネツト フジツウ(カ',150640]],
+    '電化製品':[['Amazon ×10件',31372]],
+    '未定':[['スクエア ジユノビユーテイー',3300]]
+  },
+  7:{'電化製品':[['Amazon ×9件',23774]]},
+  8:{'電化製品':[['Amazon ×1件',1598]]}
 };
 // ノーカウント候補カテゴリ（予算外として除外できる項目）
 const NC_CATS=['税金'];
@@ -913,7 +949,7 @@ function showStackDrill(idx){
     return items.filter(([k])=>noCountKeys.has(`${yr}_${mi}_${k}`)).reduce((s,[,v])=>s+v,0);
   }
 
-  function buildRows(items){
+  function buildRows(items, txData){
     const mx=Math.max(...items.map(([,v])=>Math.abs(v)),1);
     return items.map(([k,v],ci)=>{
       const ncKey=`${yr}_${mi}_${k}`;
@@ -923,17 +959,27 @@ function showStackDrill(idx){
       const ncBtn=isNC
         ?`<button onclick="toggleNC('${ncKey}')" style="margin-left:6px;font-size:9px;padding:1px 7px;border-radius:8px;border:1px solid ${isExc?'#34d39966':'#f87171aa'};background:${isExc?'#34d39914':'#f8717114'};color:${isExc?'#34d399':'#f87171'};cursor:pointer;">${isExc?'✓除外中':'除外'}</button>`
         :'';
+      // 取引明細サブ表示
+      const txItems=txData&&txData[k];
+      const subHtml=txItems&&txItems.length>0
+        ?`<div style="margin:4px 0 6px 0;padding-left:8px;border-left:2px solid ${pal[ci%pal.length]}33;">${
+          txItems.map(([n,a])=>`<div style="display:flex;justify-content:space-between;font-size:10px;color:#6b7280;padding:1px 0;">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${n}</span>
+            <span style="margin-left:8px;flex-shrink:0;">¥${a.toLocaleString()}</span>
+          </div>`).join('')
+        }</div>`
+        :'';
       return `<div class="drill-row" style="${dimStyle}">
         <div class="drill-cat" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;">${k}${ncBtn}</div>
         <div class="drill-track"><div class="drill-fill" style="width:${Math.round(Math.abs(v)/mx*100)}%;background:${pal[ci%pal.length]}88;"></div></div>
         <div class="drill-val" style="color:${pal[ci%pal.length]};">${v>=0?'¥'+Math.round(v/1000)+'K':'−¥'+Math.round(-v/1000)+'K'}</div>
-      </div>`;
+      </div>${subHtml}`;
     }).join('');
   }
 
-  function section(name,amount,color,items){
+  function section(name,amount,color,items,txData){
     const rows=items
-      ? buildRows(items)
+      ? buildRows(items,txData)
       : `<div style="color:#2a3458;font-size:11px;padding:2px 0 6px;">実家送金・docomo・サブスク等</div>`;
     const nc=ncAmt(items);
     const adjNote=nc>0?`　<span style="color:#34d399;font-size:10px;font-weight:500;">→ 除外後 ¥${(amount-nc).toLocaleString()}</span>`:'';
@@ -973,11 +1019,12 @@ function showStackDrill(idx){
   const totalNC=ncAmt(sItems);
   const total=F+V+S;
   const totalNote=totalNC>0?`　<span style="font-size:12px;color:#34d399;">→ 除外後 ¥${(total-totalNC).toLocaleString()}</span>`:'';
+  const txData=yr===2025?sTx25[mi]:null;
   document.getElementById('stackDrillTitle').innerHTML=`${lbl}　合計 ¥${total.toLocaleString()}${totalNote}`;
   document.getElementById('stackDrillContent').innerHTML=
-    section('固定費',F,'#3b82f6',fItems)+
-    section('変動費',V,'#34d399',vItems)+
-    section('特別費',S,'#f59e0b',sItems);
+    section('固定費',F,'#3b82f6',fItems,null)+
+    section('変動費',V,'#34d399',vItems,null)+
+    section('特別費',S,'#f59e0b',sItems,txData);
 
   drill.classList.add('open');
   setTimeout(()=>drill.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
